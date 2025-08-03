@@ -10,6 +10,7 @@ public class ScreenShotter : MonoBehaviour
         int width = Screen.width; int height = Screen.height;
         RenderTexture rt = RenderTexture.GetTemporary(width, height, 24);
         Camera MainCamera = Camera.main;
+
         if (!MainCamera)
         {
             Debug.LogError(Constants.Camera_Not_Found);

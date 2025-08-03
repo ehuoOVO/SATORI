@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Newtonsoft.Json;
+using System.IO;
+using Unity.VisualScripting;
 
 public class SaveLoad : MonoBehaviour
 {
@@ -17,6 +20,7 @@ public class SaveLoad : MonoBehaviour
     private int CurrentPage = Constants.Defalut_Start_Index;
     private readonly int SlotsPerPage = Constants.Slots_Per_Page;
     private readonly int TotalSlots = Constants.Total_Slots;
+    private System.Action<int> CurrentAction;
 
     public static SaveLoad Instance { get; private set; }
 
@@ -35,34 +39,76 @@ public class SaveLoad : MonoBehaviour
         SaveLoadPanel.SetActive(false);
     }
 
-    public void ShowSaveLoad(bool save)
+    public void ShowSavePanel(System.Action<int> action)
     {
-        isSaving = save;
-        Title.text = isSaving ? "保存旅途节点" : "载入旅途节点" ;
-        UpdateSaveLoad();
+        isSaving = true;
+        Title.text = "保存旅途节点";
+        CurrentAction = action;
+        UpdateUI();
         SaveLoadPanel.SetActive(true);
-        LoadStoryLineAndScreenShots();
+    }
+    public void ShowLoadPanel(System.Action<int> action)
+    {
+        isSaving = false;
+        Title.text = "载入旅途节点";
+        CurrentAction = action;
+        UpdateUI();
+        SaveLoadPanel.SetActive(true);
     }
 
-    private void UpdateSaveLoad()
+    private void UpdateUI()
     {
-        for(int i = 0;i < SlotsPerPage; i++)
+        for(int i = 0; i < SlotsPerPage; i++)
         {
             int SlotsIndex = CurrentPage * SlotsPerPage + i;
-            if(SlotsIndex < TotalSlots)
+            if (SlotsIndex < TotalSlots)
             {
-                SaveLoadButton[i].gameObject.SetActive(true);
-                SaveLoadButton[i].interactable = true;
-
-                var SlotText = (SlotsIndex + 1) + "：空节点";
-                var TextComponents = SaveLoadButton[i].GetComponentsInChildren<TextMeshProUGUI>();
-                TextComponents[0].text = null;
-                TextComponents[1].text = SlotText;
-                SaveLoadButton[i].GetComponentInChildren<RawImage>().texture = null;
-
+                UpdateSaveLoad(SaveLoadButton[i], SlotsIndex); 
+                LoadStoryLineAndScreenShots(SaveLoadButton[i], SlotsIndex);
             }
             else SaveLoadButton[i].gameObject.SetActive(false);
         }
+    }
+
+    private void UpdateSaveLoad(Button B,int index)
+    {
+        B.gameObject.SetActive(true);
+        B.interactable = true;
+
+        var savePath = GenerateDataPath(index);
+        var fileExists = File.Exists(savePath);
+
+
+        if(!isSaving && !fileExists)
+        {
+            B.interactable = false;
+        }
+
+        var textComponents = B.GetComponentsInChildren<TextMeshProUGUI>();
+        textComponents[0].text = null;
+        textComponents[1].text = (index + 1) + "：空的节点";
+        B.GetComponentInChildren<RawImage>().texture = null;
+
+        B.onClick.RemoveAllListeners();
+        B.onClick.AddListener(() => OnButtonClick(B, index));
+    }
+
+    private void OnButtonClick(Button B,int index)
+    {
+        CurrentAction?.Invoke(index);
+        if (isSaving)
+        {
+            LoadStoryLineAndScreenShots(B, index);
+        }
+        else
+        {
+
+        }
+    }
+
+    private string GenerateDataPath(int index)
+    {
+        return Path.Combine(Application.persistentDataPath, Constants.Save_File_Path, index + Constants.Save_File_Extension);
     }
 
     private void PrevPage()
@@ -70,8 +116,7 @@ public class SaveLoad : MonoBehaviour
         if(CurrentPage > 0)
         {
             CurrentPage--;
-            UpdateSaveLoad();
-            LoadStoryLineAndScreenShots();
+            UpdateUI();
         }
     }
     private void NextPage()
@@ -79,8 +124,7 @@ public class SaveLoad : MonoBehaviour
         if ((CurrentPage + 1) * SlotsPerPage < TotalSlots) 
         {
             CurrentPage++;
-            UpdateSaveLoad();
-            LoadStoryLineAndScreenShots();
+            UpdateUI();
         }
     }
 
@@ -90,8 +134,25 @@ public class SaveLoad : MonoBehaviour
     }
     
 
-    private void LoadStoryLineAndScreenShots()
+    private void LoadStoryLineAndScreenShots(Button B,int index)
     {
-
+        var savePath = GenerateDataPath(index);
+        if (File.Exists(savePath))
+        {
+            string json = File.ReadAllText(savePath);
+            var saveData = JsonConvert.DeserializeObject<VNmanager.SaveData>(json);
+            if (saveData.ScreenshotData != null)
+            {
+                Texture2D screenShot = new Texture2D(2, 2);
+                screenShot.LoadImage(saveData.ScreenshotData);
+                B.GetComponentInChildren<RawImage>().texture = screenShot;
+            }
+            if(saveData.currentSpeakingContent != null)
+            {
+                var textComponents = B.GetComponentsInChildren<TextMeshProUGUI>();
+                textComponents[0].text = saveData.currentSpeakingContent;
+                textComponents[1].text = File.GetLastWriteTime(savePath).ToString("G");
+            }
+        }
     }
 }

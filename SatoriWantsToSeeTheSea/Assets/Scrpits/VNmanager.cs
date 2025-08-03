@@ -201,7 +201,7 @@ public class VNmanager : MonoBehaviour
     public void InitializeSaveFilePath()
     {
         SaveFolderPath = Path.Combine(Application.persistentDataPath, Constants.Save_File_Path);
-        if (!Directory.Exists(SaveFolderPath)) Directory.Exists(SaveFolderPath);
+        if (!Directory.Exists(SaveFolderPath)) Directory.CreateDirectory(SaveFolderPath);
     }
 
     void InitializeAndLoad(string filename)
@@ -599,8 +599,9 @@ public class VNmanager : MonoBehaviour
     #region Save
     public class SaveData
     {
-        public string currentContent;
-        public byte[] ScreenshotData;
+        public string currentSpeakingContent;
+        public byte[] 
+            ScreenshotData;
         public int TrustRIN;
         public int TrustREK;
     }
@@ -612,7 +613,7 @@ public class VNmanager : MonoBehaviour
         {
             Texture2D ScreenShot = screenShotter.CaptureScreenShot();
             ScreenShotData = ScreenShot.EncodeToPNG();
-            SaveLoad.Instance.ShowSaveLoad(true);
+            SaveLoad.Instance.ShowSavePanel(Save);
         }
         else
         {
@@ -622,7 +623,16 @@ public class VNmanager : MonoBehaviour
 
     private void Save(int slotIndex)
     {
-        
+        var saveData = new SaveData
+        {
+            currentSpeakingContent = currentContent,
+            ScreenshotData = ScreenShotData,
+            TrustRIN = TrustData.RIN,
+            TrustREK = TrustData.REK
+        };
+        string savePath = Path.Combine(SaveFolderPath, slotIndex + Constants.Save_File_Extension);
+        string json = JsonConvert.SerializeObject(saveData, Formatting.Indented);
+        File.WriteAllText(savePath, json);
     }
     #endregion
     void ClickLoad()
@@ -630,12 +640,17 @@ public class VNmanager : MonoBehaviour
         isSaveOrLoad = !isSaveOrLoad;
         if (isSaveOrLoad)
         {
-            SaveLoad.Instance.ShowSaveLoad(false);
+            SaveLoad.Instance.ShowSavePanel(Load);
         }
         else
         {
             SaveLoad.Instance.GoBack();
         }
+    }
+
+    void Load(int slotIndex)
+    {
+
     }
     #endregion
     #region SettingButtons
